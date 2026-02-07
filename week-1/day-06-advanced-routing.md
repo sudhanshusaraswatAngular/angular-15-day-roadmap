@@ -1,36 +1,72 @@
 # Day 6: Advanced Routing & Guards (Weekend)
 
 ## 🎯 Learning Objectives
-- Master route guards (CanActivate, CanDeactivate, Resolve)
-- Implement lazy loading
-- Create preloading strategies
-- Build protected routes
+- Master all route guard types
+- Implement authentication guards
+- Handle unsaved changes
+- Prefetch data with Resolve guards
+- Configure lazy loading
+- Custom preloading strategies
 
-## 🌅 Theory - Route Guards
+## 🌅 Morning Session - Theory
 
-### Guard Types
+### Route Guards Types
+
+| Guard | Interface | Purpose | Return Type |
+|-------|-----------|---------|-------------|
+| CanActivate | CanActivateFn | Can route be activated? | boolean/UrlTree |
+| CanDeactivate | CanDeactivateFn | Can leave current route? | boolean |
+| Resolve | ResolveFn | Prefetch data before navigation | any |
+| CanLoad | CanLoadFn | Can lazy-load module? | boolean |
+| CanActivateChild | CanActivateChildFn | Can activate child routes? | boolean |
+
+### CanActivate Guard (Authentication)
 ```typescript
-// CanActivate - Prevent unauthorized access
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+
 export const authGuard: CanActivateFn = (route, state) => {
+  const router = inject(Router);
   const authService = inject(AuthService);
+  
   if (authService.isLoggedIn()) {
     return true;
   }
-  return inject(Router).createUrlTree(['/login']);
+  
+  return router.createUrlTree(['/login']);
 };
 
-// CanDeactivate - Warn before leaving
-export const unsavedChangesGuard: CanDeactivateFn<ComponentType> = (component) => {
-  if (component.hasUnsavedChanges()) {
-    return confirm('You have unsaved changes. Leave anyway?');
+// In routes
+{ path: 'admin', component: AdminComponent, canActivate: [authGuard] }
+```
+
+### CanDeactivate Guard (Unsaved Changes)
+```typescript
+export const unsavedChangesGuard: CanDeactivateFn<any> = (component) => {
+  if (component.hasUnsavedChanges && component.hasUnsavedChanges()) {
+    return confirm('You have unsaved changes. Do you want to leave?');
   }
   return true;
 };
+```
 
-// Resolve - Prefetch data
+### Resolve Guard (Data Prefetching)
+```typescript
 export const userResolver: ResolveFn<User> = (route) => {
-  return inject(UserService).getUser(route.params['id']);
+  const userService = inject(UserService);
+  const id = route.paramMap.get('id')!;
+  return userService.getUserById(id);
 };
+
+// In routes
+{ path: 'user/:id', component: UserComponent, resolve: { user: userResolver } }
+
+// In component
+ngOnInit() {
+  this.route.data.subscribe(data => {
+    this.user = data['user'];
+  });
+}
 ```
 
 ### Lazy Loading
@@ -38,8 +74,7 @@ export const userResolver: ResolveFn<User> = (route) => {
 const routes: Routes = [
   {
     path: 'admin',
-    loadChildren: () => import('./admin/admin.routes').then(m => m.ADMIN_ROUTES),
-    canActivate: [authGuard]
+    loadChildren: () => import('./admin/admin.routes').then(m => m.ADMIN_ROUTES)
   }
 ];
 ```
@@ -48,6 +83,7 @@ const routes: Routes = [
 ```typescript
 import { PreloadAllModules } from '@angular/router';
 
+// Preload all lazy modules
 bootstrapApplication(AppComponent, {
   providers: [
     provideRouter(routes, withPreloading(PreloadAllModules))
@@ -55,82 +91,105 @@ bootstrapApplication(AppComponent, {
 });
 ```
 
-## 🚀 Practice Tasks (8 hours)
+## 🌙 Evening Session - Practice Tasks
 
-### Session 1 (10 AM - 1 PM)
-- Create all guard types
-- Implement authentication guard
-- Build unsaved changes guard
-- Create data resolver
+### Task 1: Authentication Guard (60 min)
+- Create AuthService with login/logout
+- Implement CanActivate guard
+- Redirect to login if not authenticated
+- Store auth state in localStorage
 
-### Session 2 (2 PM - 5 PM)
-- Set up lazy loading
-- Implement custom preloading
-- Build admin section with guards
-- Complete multi-page protected app
+### Task 2: Unsaved Changes Guard (45 min)
+- Create form component
+- Implement CanDeactivate guard
+- Show confirmation dialog
+- Handle browser back button
 
-### Interview Practice (5 PM - 6 PM)
-- Practice 20 routing questions
-- Code guards from memory
+### Task 3: Resolve Guard (45 min)
+- Create resolver for user data
+- Implement loading indicator
+- Handle errors in resolver
+- Cache resolved data
+
+### Task 4: Lazy Loading (60 min)
+- Split app into feature modules
+- Configure lazy loading
+- Test bundle sizes
+- Implement preloading strategy
+
+### Task 5: Complete Admin Project (90 min)
+Build protected admin section with:
+- Login page
+- Authentication guard
+- Role-based access
+- Lazy-loaded admin module
+- Unsaved changes protection
 
 ## 🎯 Interview Questions
 
 **1. What are route guards?**
 - Functions that control navigation
-- Can prevent/allow route activation
-- Used for authentication, validation
+- Return boolean or UrlTree
+- Used for authentication, authorization, data loading
 
 **2. Types of guards?**
-- CanActivate: Before entering route
-- CanDeactivate: Before leaving route
+- CanActivate: Can access route?
+- CanDeactivate: Can leave route?
 - Resolve: Prefetch data
-- CanLoad: Lazy loading control
-- CanActivateChild: Child routes
+- CanLoad: Can load lazy module?
+- CanActivateChild: Can access child routes?
 
-**3. What is lazy loading?**
-- Load modules on-demand
-- Reduces initial bundle size
-- Uses loadChildren property
-- Improves performance
+**3. CanActivate vs CanLoad?**
+- CanActivate: Checks after module loads
+- CanLoad: Prevents module loading entirely
+- CanLoad better for large lazy modules
 
-**4. CanActivate vs CanLoad?**
-- CanActivate: Module already loaded
-- CanLoad: Before loading module
-- CanLoad better for security
+**4. How to pass data to guards?**
+- Route data property
+- ActivatedRouteSnapshot
+- Service injection
 
 **5. What is Resolve guard?**
 - Prefetches data before navigation
-- Component receives data immediately
-- Prevents showing loading states
+- Component receives data via route.data
+- Delays navigation until data ready
 
-**6. Preloading strategies?**
-- NoPreloading: Load only on demand
-- PreloadAllModules: Preload all lazy modules
-- Custom: Selective preloading
+**6. How to implement role-based routing?**
+- Store user roles in AuthService
+- Check roles in CanActivate guard
+- Return false or redirect if unauthorized
 
-**7. How to create custom preloading?**
-- Implement PreloadingStrategy interface
-- Define preload method
-- Return Observable<any> or null
+**7. What is lazy loading?**
+- Load modules on-demand
+- Reduces initial bundle size
+- Use loadChildren property
+- Improves app performance
 
-**8. Route guard return types?**
-- boolean: Allow/deny
-- UrlTree: Redirect
-- Observable/Promise: Async decisions
+**8. Preloading strategies?**
+- NoPreloading: Default, no preloading
+- PreloadAllModules: Preload all after initial load
+- Custom: Preload based on conditions
 
-**9. Multiple guards on one route?**
-- Yes, executed in order
-- All must return true
-- First false/UrlTree stops execution
+**9. How guards affect performance?**
+- Resolve guards delay navigation
+- CanLoad prevents unnecessary downloads
+- Multiple guards execute in order
+- Heavy logic should be async
 
-**10. Guard execution order?**
-- CanLoad → CanActivate → CanActivateChild → Resolve → Component
+**10. Can multiple guards be applied?**
+- Yes, array of guards
+- Execute in order defined
+- All must return true to proceed
+- First rejection stops navigation
 
 ## ✅ Checklist
-- [ ] Created all guard types
-- [ ] Implemented lazy loading
-- [ ] Built preloading strategy
-- [ ] Completed protected app
-- [ ] Practiced 20 questions
+- [ ] Implemented all guard types
+- [ ] Created authentication system
+- [ ] Built unsaved changes protection
+- [ ] Configured lazy loading
+- [ ] Custom preloading strategy
+- [ ] Completed admin project
+
+**Tomorrow:** Forms (Template-driven & Reactive)
 
 [← Day 5](day-05-routing-basics.md) | [README](../README.md) | [Day 7 →](day-07-forms.md)
